@@ -562,21 +562,6 @@ router eigrp 100
  eigrp stub redistribute
 ```
 
-### 라우팅 테이블 검증 결과 (SW1 기준)
-
-```
-14.0.0.0/8 is variably subnetted, 18 subnets, 2 masks
-O IA  14.14.2.2/32   via 14.14.36.6
-O     14.14.3.0/24   via 14.14.33.3
-D     14.14.8.0/24   via 14.14.90.2  (EIGRP)
-D     14.14.9.0/24   via 14.14.90.3  (EIGRP)
-O IA  14.14.20.0/24  via 14.14.36.6
-O IA  14.14.26.0/24  via 14.14.36.6
-O IA  14.14.62.0/24  via 14.14.36.6
-C     14.14.90.0/24  directly connected, Vlan100
-O     14.14.245.0/24 via 14.14.36.6
-```
-
 <br>
 
 ---
