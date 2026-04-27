@@ -10,13 +10,13 @@
 | 항목 | 내용 |
 |------|------|
 | **기간** | 2026.02 |
-| **플랫폼** | Cisco IOS 12.4 (ㅁ) |
+| **플랫폼** | Web-IOU |
 | **규모** | Router 6대 (R1~R6) · Switch 4대 (SW1~SW4) · BB 3대 |
 | **팀 구성** | 김동진 · 이영훈 · 장규혁 · 정성현 |
 
 <br>
 
-## 🗺️ 구성도
+## 구성도
 
 ### 논리적 구성도 및 물리적 구성도
 
@@ -42,7 +42,7 @@ image
 
 <br>
 
-## 📂 설정 목차
+## 설정 목차
 
 1. [Frame Relay 구성](#1-frame-relay-구성)
 2. [Bridging & Switching](#2-bridging--switching)
@@ -92,7 +92,22 @@ interface s1/0.206 point-to-point
  ip address 14.14.26.2 255.255.255.0
  frame-relay interface-dlci 206
 
+! R3
+interface s1/0
+ encapsulation frame-relay
+ no frame-relay inverse-arp
+ no shutdown
+
+interface s1/0.301 point-to-point
+ ip address 14.14.13.3 255.255.255.0
+ frame-realy interface-dlci 301
+
 ! R4
+interface s1/0
+ encapsulation frame-relay
+ no frame-relay inverse-arp
+ no shutdown
+
 interface s1/0.245 multipoint
  ip address 14.14.245.4 255.255.255.0
  frame-relay map ip 14.14.245.5 405 broadcast
@@ -101,6 +116,11 @@ interface s1/0.245 multipoint
  ip ospf network broadcast
 
 ! R5
+interface s1/0
+ encapsulation frame-relay
+ no frame-relay inverse-arp
+ no shutdown
+
 interface s1/0.245 multipoint
  ip address 14.14.245.5 255.255.255.0
  frame-relay map ip 14.14.245.2 502 broadcast
@@ -109,6 +129,11 @@ interface s1/0.245 multipoint
  ip ospf network broadcast
 
 ! R6
+interface s1/0
+ encapsulation frame-relay
+ no frame-relay inverse-arp
+ no shutdown
+
 interface s1/0.602 point-to-point
  ip address 14.14.26.6 255.255.255.0
  frame-relay interface-dlci 602
@@ -142,6 +167,9 @@ vtp version 2
 
 ```cisco
 ! R6 — 서브인터페이스로 dot1q 트렁크 구성
+interface e0/1
+ no shutdown
+
 interface e0/1.13
  encapsulation dot1q 13
  ip address 150.3.14.1 255.255.255.0
@@ -157,7 +185,7 @@ interface e1/2
  switchport trunk allowed vlan 13,22
 ```
 
-### 2-3. EtherChannel 구성
+### 2-3, 2-4 SW 구성
 
 스위치 간 대역폭 확장 및 이중화를 위한 EtherChannel 구성
 
@@ -173,18 +201,48 @@ interface range e3/2-3
  switchport mode trunk
  channel-group 13 mode on    ! SW1-SW3 Po13
 
+! SW2
+interface range e3/0-1
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ channel-group 12 mode on
+
+interface range e3/2-3
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ channel-group 24 mode on
+
+! SW3
+interface range e3/0-1
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ channel-group 34 mode on
+
+interface range e3/2-3
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ channel-group 13 mode on
+
+! SW4
+interface range e3/0-1
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ channel-group 34 mode on
+
+interface range e3/2-3
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ channel-group 24 mode on
+
+! SW1-SW4
+interface range e2/2-3
+ shutdown
+
 ! SW1-SW2 로드밸런싱
 port-channel load-balance src-dst-ip
 ```
 
-| Port-Channel | 연결 구간 | 포트 |
-|-------------|---------|------|
-| Po12 | SW1 ↔ SW2 | Et3/0, Et3/1 |
-| Po13 | SW1 ↔ SW3 | Et3/2, Et3/3 |
-| Po24 | SW2 ↔ SW4 | Et3/2, Et3/3 |
-| Po34 | SW3 ↔ SW4 | Et3/0, Et3/1 |
-
-### 2-4. VLAN 구성 (SW1)
+### 2-5. VLAN 구성
 
 ```cisco
 vlan 11
@@ -205,9 +263,53 @@ vlan 79
  name VLAN_CUSTOMER2
 vlan 100
  name VLAN_SWITCHES
+
+int e2/0
+ switchport mode access
+ switchport access vlan 11
+
+int e0/0
+ switchport mode access
+ switchport access vlan 11
+
+int e0/2
+ switch port mode access
+ switchport access vlan 22
+
+interface e0/3
+ no switchport
+ ip address 14.14.33.7 255.255.255.0
+
+interface e1/2
+ no switchport
+ ip address 14.14.36.7 255.255.255.0
+
+! SW2
+interface e2/0
+ switchport mode access
+ switchport access vlan 12
+
+interface e1/2
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ switchport trunk allowed vlan 13,22
+
+interface e0/2
+ switchport mode access
+ switchport access vlan 21
+
+int e1/1
+ switchport mode access
+ switchport access vlan 23
+
+! SW3
+interface e2/0
+ switchport mode access
+ switchport access vlan 13
+
 ```
 
-### 2-5. MST (Multiple Spanning Tree)
+### 2-6. STP shared vlan
 
 VLAN 그룹별 루트 스위치를 분산하여 루프 방지 및 트래픽 최적화
 
@@ -219,25 +321,41 @@ spanning-tree mst configuration
  revision 1
  instance 1 vlan 11,21
  instance 2 vlan 100
- instance 3 vlan 12
 
 ! SW1 — Instance 1 Root
 spanning-tree mst 1 root primary
 
 ! SW4 — Instance 2 Root
 spanning-tree mst 2 root primary
+```
 
-! SW2 — Instance 3 Root
+### 2-8. ﻿UDLD
+
+```cisco
+! SW3-SW4
+int ran e3/0-1
+ udld port aggressive
+```
+
+### 2-10. Mac address Database
+
+```cisco
+! SW3
+mac address-table aging-time 500 vlan 13
+```
+
+### 2-11. Root Switch
+
+```cisco
+! SW1-SW4
+spanning-tree mst configuration
+ instance 3 vlan 12
+
+! SW2
 spanning-tree mst 3 root primary
 ```
 
-| MST Instance | VLAN | Root Switch |
-|-------------|------|------------|
-| Instance 1 | 11, 21 | SW1 |
-| Instance 2 | 100 | SW4 |
-| Instance 3 | 12 | SW2 |
-
-### 2-6. SVI (VLAN 100 인터페이스)
+### 2.13 Create the interfaces VLAN below VLAN 100 (VLAN_SWITCHES)
 
 ```cisco
 ! SW1
@@ -245,7 +363,20 @@ interface vlan 100
  no shutdown
  ip address 14.14.90.1 255.255.255.0
 
-! SW2: 14.14.90.2 / SW3: 14.14.90.3 / SW4: 14.14.90.4
+! SW2
+interface vlan 100
+ no shutdown
+ ip address 14.14.90.2 255.255.255.0
+
+! SW3
+interface vlan 100
+ no shutdown
+ ip address 14.14.90.3 255.255.255.0
+
+! SW4
+interface vlan 100
+ no shutdown
+ ip address 14.14.90.4 255.255.255.0
 ```
 
 <br>
@@ -283,9 +414,28 @@ router rip
 ip routing
 router eigrp 14
  no auto-summary
- network 14.14.90.1 0.0.0.0
+ network 14.14.90.1 0.0.0.0        ! VLAN_SWITCHES SVI
 
-! SW2: network 14.14.90.2 / SW3: 14.14.90.3 / SW4: 14.14.90.4
+! SW2
+ip routing
+router eigrp 14
+ no auto-summary
+ network 14.14.8.8 0.0.0.0         ! Loopback0
+ network 14.14.90.2 0.0.0.0        ! VLAN_SWITCHES SVI
+
+! SW3
+ip routing
+router eigrp 14
+ no auto-summary
+ network 14.14.9.9 0.0.0.0         ! Loopback0
+ network 14.14.90.3 0.0.0.0        ! VLAN_SWITCHES SVI
+
+! SW4
+ip routing
+router eigrp 14
+ no auto-summary
+ network 14.14.10.10 0.0.0.0       ! Loopback0
+ network 14.14.90.4 0.0.0.0        ! VLAN_SWITCHES SVI
 ```
 
 ### 3-3. EIGRP 100 (R6 ↔ BB3)
@@ -301,12 +451,17 @@ router eigrp 100
 ### 3-4. OSPF Multi-Area
 
 ```cisco
-! Area 0 — Backbone
+! Area 0
 ! R2
 router ospf 14
  network 14.14.245.2 0.0.0.0 area 0
- int s1/0.245
-  ip ospf priority 0          ! DR 선출 방지
+
+int s1/0.245
+ ip ospf priority 0          ! DR 선출 방지
+
+! R6
+router ospf 14
+ network 14.14.36.6 0.0.0.0 area 0
 
 ! R4, R5 동일하게 priority 0 설정
 ! SW1
@@ -319,16 +474,23 @@ router ospf 14
  network 14.14.3.3 0.0.0.0 area 3
  network 14.14.33.3 0.0.0.0 area 3
 
+! SW1
+router ospf 14
+ network 14.14.33.7 0.0.0.0 area 3
+ network 14.14.7.7 0.0.0.0 area 3
+
 ! Area 4 — Totally Stub
 ! R2
 router ospf 14
- network 14.14.2.2 0.0.0.0 area 4
+ net 14.14.2.2 0.0.0.0 area 4
+ net 14.14.20.2 0.0.0.0 area 4
  area 4 stub no-summary
 
 ! Area 5 — Stub
 ! R5
 router ospf 14
- network 14.14.55.5 0.0.0.0 area 5
+ net 14.14.55.5 0.0.0.0 area 5
+ net 14.14.5.5 0.0.0.0 area 5
  area 5 stub
 
 ! Area 26 — Virtual-Link (비연속 Area 26을 Backbone에 연결)
@@ -338,11 +500,21 @@ router ospf 14
  network 14.14.26.2 0.0.0.0 area 26
  area 26 virtual-link 14.14.6.6
 
+int s1/0.206
+ ip ospf network point-to-point
+int e0/0
+ ip ospf network point-to-point
+
 ! R6
 router ospf 14
  network 14.14.62.6 0.0.0.0 area 26
  network 14.14.26.6 0.0.0.0 area 26
  area 26 virtual-link 14.14.2.2
+
+int s1/0.602
+ ip ospf network point-to-point
+int e0/1.22
+ ip ospf network point-to-point
 ```
 
 > **Loopback /32 방지**: OSPF 라우팅 테이블에 /32가 아닌 /24로 표시되도록 설정
@@ -409,21 +581,7 @@ O     14.14.245.0/24 via 14.14.36.6
 
 ---
 
-## 5. 보안 및 기타 설정
-
-### 5-1. OSPF MD5 인증 (Area 0)
-
-```cisco
-! R2
-router ospf 14
- area 0 authentication message-digest
- area 26 virtual-link 14.14.6.6 message-digest-key 1 md5 history
-
-interface s1/0
- ip ospf message-digest-key 1 md5 history
-
-! R4, R5, SW1, R6 동일하게 적용
-```
+## 5. 기타 설정
 
 ### 5-2. DHCP 서버 (R6)
 
@@ -449,16 +607,22 @@ interface e0/1.13
  ip helper-address 150.2.14.244
 ```
 
-### 5-4. MAC Address 관련
+## 6. 보안
+
+### 6-1. OSPF MD5 인증 (Area 0)
 
 ```cisco
-! SW3 — VLAN 13 aging time 조정
-mac address-table aging-time 500 vlan 13
+! R2
+router ospf 14
+ area 0 authentication message-digest
+ area 26 virtual-link 14.14.6.6 message-digest-key 1 md5 history
 
-! SW3-SW4 — UDLD Aggressive 모드 (단방향 링크 감지)
-interface range e3/0-1
- udld port aggressive
+interface s1/0
+ ip ospf message-digest-key 1 md5 history
+
+! R4, R5, SW1, R6 동일하게 적용
 ```
+
 
 <br>
 
