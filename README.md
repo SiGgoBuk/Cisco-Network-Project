@@ -20,9 +20,9 @@
 
 ### 논리적 구성도 및 물리적 구성도
 
-image
-image
-image
+![IP](images/148-IP.png)
+![IGP](images/148-IGP.png)
+![IOU](images/IOU.png)
 
 <br>
 
